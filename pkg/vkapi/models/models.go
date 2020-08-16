@@ -17,6 +17,7 @@ type User struct {
 	LastName    string     `json:"last_name" db:"last_name"`
 	Sex         int        `json:"sex" db:"sex"`
 	Photo       string     `json:"photo" db:"photo"`
+	Photo200    string     `json:"photo_200" db:"photo200"`
 	Deactivated *string    `json:"deactivated" db:"deactivated"`
 	LastSeen    *time.Time `json:"last_seen" db:"last_seen"`
 	Groups      []*Group   `json:"groups" gorm:"many2many:group_members"`

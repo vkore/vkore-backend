@@ -13,13 +13,12 @@ import (
 	"time"
 )
 
-var groupsToParse = []string{"podolsk_naodinraz", "knowledge50pd", "znakomstva_v_podolske", "virtual.dating", "podolsk_love", "znakomstvoodolsk", "podolsk_znakomstva_v", "publicpoznakomlys2016"}
-
-//var groupsToParse = []string{"knowledge50pd", "podolsk_love", "virtual.dating", "podolsk_naodinraz", "znakomstva_v_podolske", "public192002298"}
+//var groupsToParse = []string{"podolsk_naodinraz", "knowledge50pd", "znakomstva_v_podolske", "virtual.dating", "podolsk_love", "znakomstvoodolsk", "podolsk_znakomstva_v", "publicpoznakomlys2016"}
+var groupsToParse = []string{"podolsk_naodinraz", "knowledge50pd"}
 
 var wg sync.WaitGroup
 
-func Do() {
+func GetPages() []*models.User {
 	client, err := vkapi.NewVKClient(vkapi.DeviceIPhone, os.Getenv("VK_USER"), os.Getenv("VK_PASSWORD"), true)
 
 	if err != nil {
@@ -65,6 +64,7 @@ func Do() {
 	target := store.GetUsers(filters...)
 
 	fmt.Println("GOT USERS", len(target))
+	return target
 }
 
 func GetGroupMembers(c *vkapi.VKClient, group *models.Group) ([]*models.User, error) {
@@ -74,7 +74,8 @@ func GetGroupMembers(c *vkapi.VKClient, group *models.Group) ([]*models.User, er
 		return nil, err
 	}
 
-	totalCount := 25000
+	//totalCount := 25000
+	totalCount := 10000
 	offset := 0
 	for {
 		values := make(url.Values)
@@ -84,14 +85,14 @@ var offset = 0;
 
 var count = 0;
 var i = 0;
-while (i < 25 && (offset + %v) < %v) {
+while (i < 10 && (offset + %v) < %v) {
   var m = API.groups.getMembers({
     "group_id": %v,
     "v": "5.27",
     "sort": "id_asc",
     "count": "1000",
     "offset": (%v + offset),
-    "fields": "sex,deactivated,last_seen"
+    "fields": "sex,deactivated,last_seen,photo,photo_200"
   });
   members.push(m.items);
   count = m.count;
@@ -131,8 +132,8 @@ return { "users": members, "count": count };
 		if len(users) >= resp.Count {
 			break
 		}
-		offset += 25000
-		totalCount += 25000
+		offset += 10000
+		totalCount += 10000
 	}
 
 	return users, nil

@@ -51,7 +51,7 @@ func CreateUsers(users []*models.User) error {
 	}
 
 	insertUsers := func(args interface{}) (sql.Result, error) {
-		return db.NamedExec("INSERT INTO users (id, first_name, last_name, sex, photo, deactivated, last_seen) VALUES (:id, :first_name, :last_name, :sex, :photo, :deactivated, :last_seen) ON CONFLICT DO NOTHING", args)
+		return db.NamedExec("INSERT INTO users (id, first_name, last_name, sex, photo, photo200, deactivated, last_seen) VALUES (:id, :first_name, :last_name, :sex, :photo, :photo200, :deactivated, :last_seen) ON CONFLICT DO NOTHING", args)
 	}
 
 	var err error
