@@ -130,3 +130,17 @@ func GetGroupLastUpdate(groupID int) (*time.Time, error) {
 	}
 	return group.LastUpdate, nil
 }
+
+func GetGroupByScreenName(name string) (group *models.Group, err error) {
+	if err = gormDB.Where("screen_name = ?", name).First(&group).Error; gorm.IsRecordNotFoundError(err) {
+		return nil, nil
+	} else if err != nil {
+		return nil, fmt.Errorf(`can't get gruop "%v": %v`, name, err)
+	}
+	return
+}
+
+func GetAllGroups() (groups []*models.Group, err error) {
+	err = gormDB.Find(&groups).Error
+	return
+}

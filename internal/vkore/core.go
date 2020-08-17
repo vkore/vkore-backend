@@ -14,30 +14,40 @@ import (
 )
 
 //var groupsToParse = []string{"podolsk_naodinraz", "knowledge50pd", "znakomstva_v_podolske", "virtual.dating", "podolsk_love", "znakomstvoodolsk", "podolsk_znakomstva_v", "publicpoznakomlys2016"}
-var groupsToParse = []string{"podolsk_naodinraz", "knowledge50pd"}
+//var groupsToParse = []string{"podolsk_naodinraz", "knowledge50pd"}
 
 var wg sync.WaitGroup
 
-func GetPages() []*models.User {
-	client, err := vkapi.NewVKClient(vkapi.DeviceIPhone, os.Getenv("VK_USER"), os.Getenv("VK_PASSWORD"), true)
+var client *vkapi.VKClient
 
+func Init() {
+	var err error
+	client, err = vkapi.NewVKClient(vkapi.DeviceIPhone, os.Getenv("VK_USER"), os.Getenv("VK_PASSWORD"), true)
 	if err != nil {
 		log.Fatal(err)
 	}
+}
 
+func GetPages(groupsToParse []string) {
 	for _, group := range groupsToParse {
-		groupInfo, err := ResolveScreenName(client, group)
-		if err != nil {
-			log.Println(err)
+		var g *models.Group
+		rrr, err := store.GetGroupByScreenName(group)
+		if rrr == nil || err != nil {
+			groupInfo, err := ResolveScreenName(client, group)
+			if err != nil {
+				log.Printf("can't get info about %v group: %v", group, err)
+				continue
+			}
+			g = &models.Group{
+				ID:         groupInfo.ObjectID,
+				ScreenName: group,
+				Type:       groupInfo.Type,
+			}
+		} else {
+			g = rrr
 		}
 
-		g := &models.Group{
-			ID:         groupInfo.ObjectID,
-			ScreenName: group,
-			Type:       groupInfo.Type,
-		}
-
-		groupLastUpdate, err := store.GetGroupLastUpdate(groupInfo.ObjectID)
+		groupLastUpdate, err := store.GetGroupLastUpdate(g.ID)
 		if err == nil {
 			yesterday := time.Now().AddDate(0, 0, -1)
 			if groupLastUpdate == nil {
@@ -53,18 +63,6 @@ func GetPages() []*models.User {
 			log.Println("can't get members:", groupMembers)
 		}
 	}
-	wg.Wait()
-
-	filters := []*store.Filter{
-		{Query: models.User{Sex: 1}},
-		{Query: "deactivated IS NULL"},
-		{Query: "last_seen > ?", Args: []interface{}{time.Now().AddDate(0, 0, -4)}},
-	}
-
-	target := store.GetUsers(filters...)
-
-	fmt.Println("GOT USERS", len(target))
-	return target
 }
 
 func GetGroupMembers(c *vkapi.VKClient, group *models.Group) ([]*models.User, error) {

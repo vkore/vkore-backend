@@ -8,6 +8,7 @@ import (
 
 func main() {
 	store.Init()
+	vkore.Init()
 	vkore.MigrateSchema()
 	api.ListenAndServe()
 }
