@@ -26,6 +26,7 @@ func Init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	client.Client.Timeout = 60 * time.Second
 }
 
 func GetPages(groupsToParse []string) {
@@ -47,18 +48,19 @@ func GetPages(groupsToParse []string) {
 			g = rrr
 		}
 
-		groupLastUpdate, err := store.GetGroupLastUpdate(g.ID)
-		if err == nil {
-			yesterday := time.Now().AddDate(0, 0, -1)
-			if groupLastUpdate == nil {
-				log.Printf(`Last update for group "%v" is nil and no errors`, group)
-			} else if groupLastUpdate.After(yesterday) {
-				log.Printf(`no need to update for group "%v": %v`, group, groupLastUpdate.Format(time.RFC822))
-				continue
-			}
-		}
+		//groupLastUpdate, err := store.GetGroupLastUpdate(g.ID)
+		//if err == nil {
+		//	yesterday := time.Now().AddDate(0, 0, -1)
+		//	if groupLastUpdate == nil {
+		//		log.Printf(`Last update for group "%v" is nil and no errors`, group)
+		//	} else if groupLastUpdate.After(yesterday) {
+		//		log.Printf(`no need to update for group "%v": %v`, group, groupLastUpdate.Format(time.RFC822))
+		//		continue
+		//	}
+		//}
 
 		groupMembers, err := GetGroupMembers(client, g)
+		log.Println("GROUP MEMBERS:", len(groupMembers))
 		if err != nil {
 			log.Println("can't get members:", groupMembers)
 		}
@@ -72,8 +74,8 @@ func GetGroupMembers(c *vkapi.VKClient, group *models.Group) ([]*models.User, er
 		return nil, err
 	}
 
-	//totalCount := 25000
-	totalCount := 10000
+	totalCount := 25000
+	//totalCount := 10000
 	offset := 0
 	for {
 		values := make(url.Values)
@@ -83,7 +85,7 @@ var offset = 0;
 
 var count = 0;
 var i = 0;
-while (i < 10 && (offset + %v) < %v) {
+while (i < 25 && (offset + %v) < %v) {
   var m = API.groups.getMembers({
     "group_id": %v,
     "v": "5.27",
@@ -121,7 +123,10 @@ return { "users": members, "count": count };
 			users = append(users, us...)
 		}
 
-		_ = store.CreateUsers(users)
+		err = store.CreateUsers(users)
+		if err != nil {
+			fmt.Println("error adding users to database:", err)
+		}
 		err = store.AddGroupMembers(group.ID, users)
 		if err != nil {
 			log.Println("error creating users in database:", err)
@@ -130,8 +135,8 @@ return { "users": members, "count": count };
 		if len(users) >= resp.Count {
 			break
 		}
-		offset += 10000
-		totalCount += 10000
+		offset += 25000
+		totalCount += 25000
 	}
 
 	return users, nil

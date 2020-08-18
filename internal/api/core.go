@@ -5,10 +5,14 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/vkore/vkore/internal/store"
+	"github.com/vkore/vkore/internal/vkore"
 	"github.com/vkore/vkore/pkg/vkapi/models"
 	"net/http"
+	"regexp"
 	"time"
 )
+
+var vkURL = regexp.MustCompile(`^((https?:\/\/)?(m\.)?((vkontakte|vk)\.)(com|ru)\/)?(?P<group>[0-9a-zA-Z_-]+)$`)
 
 func ListenAndServe() {
 	r := gin.Default()
@@ -20,6 +24,7 @@ func ListenAndServe() {
 	r.Use(cors.Default())
 	r.GET("/pages", GetUsers)
 	r.GET("/api/all_groups", GetAllGroups)
+	r.POST("/api/load_groups", LoadGroups)
 	r.Run()
 }
 
@@ -56,7 +61,7 @@ func GetUsers(c *gin.Context) {
 	}
 }
 
-func ParseGroups(c *gin.Context) {
+func LoadGroups(c *gin.Context) {
 	var groups []string
 
 	err := c.Bind(&groups)
@@ -65,6 +70,18 @@ func ParseGroups(c *gin.Context) {
 			"error": fmt.Sprintf("%v", err),
 		})
 	}
+
+	var groupNames []string
+	for _, group := range groups {
+		match := vkURL.FindStringSubmatch(group)
+		for j, name := range vkURL.SubexpNames() {
+			if name == "group" && len(match) > j && match[j] != "" {
+				groupNames = append(groupNames, match[j])
+			}
+		}
+	}
+
+	vkore.GetPages(groupNames)
 
 	// ["http://vk.com/groupname", "http://vk.com/groupname2"]...
 }

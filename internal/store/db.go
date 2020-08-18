@@ -49,7 +49,6 @@ func CreateUsers(users []*models.User) error {
 		}
 		uss = append(uss, user)
 	}
-
 	insertUsers := func(args interface{}) (sql.Result, error) {
 		return db.NamedExec("INSERT INTO users (id, first_name, last_name, sex, photo, photo200, deactivated, last_seen) VALUES (:id, :first_name, :last_name, :sex, :photo, :photo200, :deactivated, :last_seen) ON CONFLICT DO NOTHING", args)
 	}
@@ -84,7 +83,7 @@ func AddGroupMembers(groupID int, members []*models.User) error {
 	}
 
 	insertUsers := func(args interface{}) (sql.Result, error) {
-		return db.NamedExec("INSERT INTO group_members (user_id, group_id) VALUES (:user_id, :group_id)", args)
+		return db.NamedExec("INSERT INTO group_members (user_id, group_id) VALUES (:user_id, :group_id) ON CONFLICT DO NOTHING", args)
 	}
 
 	var err error
@@ -93,7 +92,7 @@ func AddGroupMembers(groupID int, members []*models.User) error {
 		usersToWriteCount := groupMembers[:maxRecordsPerQuery]
 		_, err = insertUsers(usersToWriteCount)
 		if err != nil {
-			log.Println(`error creating user:`, err)
+			log.Println(`error creating user relation:`, err)
 		}
 		groupMembers = groupMembers[maxRecordsPerQuery:]
 	}
