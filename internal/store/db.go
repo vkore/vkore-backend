@@ -110,15 +110,17 @@ type Filter struct {
 	Args  []interface{}
 }
 
-func GetUsers(filters ...*Filter) []*models.User {
+func GetUsers(limit, offset int, filters ...*Filter) ([]*models.User, int) {
 	var users []*models.User
 
 	query := gormDB
 	for _, filter := range filters {
 		query = query.Where(filter.Query, filter.Args...)
 	}
-	query.Find(&users)
-	return users
+	var count int
+	query.Model(&models.User{}).Count(&count)
+	query.Limit(limit).Offset(offset).Find(&users)
+	return users, count
 }
 
 func GetGroupLastUpdate(groupID int) (*time.Time, error) {

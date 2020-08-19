@@ -9,6 +9,7 @@ import (
 	"github.com/vkore/vkore/pkg/vkapi/models"
 	"net/http"
 	"regexp"
+	"strconv"
 	"time"
 )
 
@@ -47,18 +48,37 @@ func ListenAndServe() {
 //	c.JSON(http.StatusOK, vkore.GetPages())
 //}
 
+func invalidVariable(c *gin.Context, name string) {
+	c.JSON(http.StatusBadRequest, gin.H{
+		"error": fmt.Sprintf(`invalid query param "%v"`, name),
+	})
+}
+
+// GetUsers - получение пользователей из БД. Главная страница
 func GetUsers(c *gin.Context) {
+
+	perPage, err := strconv.Atoi(c.Query("perPage"))
+	if err != nil {
+		invalidVariable(c, "perPage")
+		return
+	}
+	offset, err := strconv.Atoi(c.Query("offset"))
+	if err != nil {
+		invalidVariable(c, "offset")
+		return
+	}
+
 	filters := []*store.Filter{
 		{Query: models.User{Sex: 1}},
 		{Query: "deactivated IS NULL"},
 		{Query: "last_seen > ?", Args: []interface{}{time.Now().AddDate(0, 0, -4)}},
 	}
 
-	target := store.GetUsers(filters...)
-	if len(target) > 20 {
-		c.JSON(http.StatusOK, target[:50])
-		return
-	}
+	target, totalCount := store.GetUsers(perPage, offset, filters...)
+	c.JSON(http.StatusOK, gin.H{
+		"items":      target,
+		"totalCount": totalCount,
+	})
 }
 
 func LoadGroups(c *gin.Context) {
