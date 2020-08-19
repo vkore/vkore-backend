@@ -92,7 +92,7 @@ while (i < 25 && (offset + %v) < %v) {
     "sort": "id_asc",
     "count": "1000",
     "offset": (%v + offset),
-    "fields": "sex,deactivated,last_seen,photo,photo_200"
+    "fields": "sex,deactivated,last_seen,photo,photo_200,city"
   });
   members.push(m.items);
   count = m.count;
@@ -138,8 +138,27 @@ return { "users": members, "count": count };
 		offset += 25000
 		totalCount += 25000
 	}
+	groupedUsers := groupUsersByCity(users)
 
+	for city, users := range groupedUsers {
+		err := store.BindUsersToCity(&city, users)
+		if err != nil {
+			log.Println("error binding cities to users:", err)
+		}
+	}
 	return users, nil
+}
+
+type UsersByCity map[models.UserCity][]*models.User
+
+func groupUsersByCity(users []*models.User) UsersByCity {
+	usersByCity := UsersByCity{}
+	for _, u := range users {
+		if u.City != nil {
+			usersByCity[*u.City] = append(usersByCity[*u.City], u)
+		}
+	}
+	return usersByCity
 }
 
 func ResolveScreenName(c *vkapi.VKClient, screenName string) (*models.Resolver, error) {
@@ -161,5 +180,5 @@ func ResolveScreenName(c *vkapi.VKClient, screenName string) (*models.Resolver, 
 }
 
 func MigrateSchema() {
-	store.GormDB().AutoMigrate(&models.User{}, &models.Group{})
+	store.GormDB().AutoMigrate(&models.User{}, &models.Group{}, &models.UserCity{})
 }

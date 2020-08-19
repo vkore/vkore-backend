@@ -18,6 +18,8 @@ type User struct {
 	Sex         int        `json:"sex" db:"sex"`
 	Photo       string     `json:"photo" db:"photo"`
 	Photo200    string     `json:"photo_200" db:"photo200"`
+	City        *UserCity  `json:"city"`
+	CityID      int        `json:"city_id"`
 	Deactivated *string    `json:"deactivated" db:"deactivated"`
 	LastSeen    *time.Time `json:"last_seen" db:"last_seen"`
 	Groups      []*Group   `json:"groups" gorm:"many2many:group_members"`
@@ -73,4 +75,9 @@ type Resolver struct {
 type GroupMember struct {
 	UserID  int `json:"user_id" db:"user_id"`
 	GroupID int `json:"group_id" db:"group_id"`
+}
+
+type UserCity struct {
+	ID    int    `json:"id"`
+	Title string `json:"title"`
 }

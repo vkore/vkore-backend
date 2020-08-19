@@ -8,6 +8,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/vkore/vkore/pkg/vkapi/models"
 	"log"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -125,7 +127,6 @@ func GetUsers(limit, offset int, filters ...*Filter) ([]*models.User, int) {
 
 func GetGroupLastUpdate(groupID int) (*time.Time, error) {
 	var group models.Group
-
 	if err := gormDB.Where("id = ?", groupID).First(&group).Error; err != nil {
 		return nil, fmt.Errorf(`can't get gruop "%v": %v`, groupID, err)
 	}
@@ -144,4 +145,22 @@ func GetGroupByScreenName(name string) (group *models.Group, err error) {
 func GetAllGroups() (groups []*models.Group, err error) {
 	err = gormDB.Find(&groups).Error
 	return
+}
+
+func BindUsersToCity(city *models.UserCity, users []*models.User) error {
+	if err := gormDB.Where(models.UserCity{ID: city.ID}).Attrs(city).FirstOrCreate(city).Error; err != nil {
+		log.Printf("error get or create gorup in database: %v", err)
+		return err
+	}
+
+	gormDB.Where([]int64{20, 21, 22}).UpdateColumn()
+
+	var usersIDs []string
+	for _, user := range users {
+		usersIDs = append(usersIDs, strconv.Itoa(user.ID))
+	}
+
+	_, err := db.Exec(`UPDATE users SET city_id = ? WHERE id IN (?);`, city.ID, strings.Join(usersIDs, ","))
+
+	return err
 }
