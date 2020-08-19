@@ -164,3 +164,8 @@ func BindUsersToCity(city *models.UserCity, users []*models.User) error {
 
 	return err
 }
+
+func GetAllCities() (cities []*models.UserCity, err error) {
+	err = gormDB.Find(&cities).Error
+	return
+}

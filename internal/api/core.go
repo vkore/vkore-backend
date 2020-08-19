@@ -26,6 +26,7 @@ func ListenAndServe() {
 	r.GET("/pages", GetUsers)
 	r.GET("/api/all_groups", GetAllGroups)
 	r.POST("/api/load_groups", LoadGroups)
+	r.GET("/api/get_cities", getCities)
 	r.Run()
 }
 
@@ -69,7 +70,7 @@ func GetUsers(c *gin.Context) {
 	}
 
 	filters := []*store.Filter{
-		{Query: models.User{Sex: 1}},
+		{Query: models.User{Sex: 1, CityID: 270}},
 		{Query: "deactivated IS NULL"},
 		{Query: "last_seen > ?", Args: []interface{}{time.Now().AddDate(0, 0, -4)}},
 	}
@@ -117,4 +118,16 @@ func GetAllGroups(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, groups)
+}
+
+func getCities(c *gin.Context) {
+
+	cities, err := store.GetAllCities()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("%v", err),
+		})
+	}
+
+	c.JSON(http.StatusOK, cities)
 }
