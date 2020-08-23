@@ -24,6 +24,7 @@ type User struct {
 	LastSeen    *time.Time `json:"last_seen" db:"last_seen"`
 	Groups      []*Group   `json:"groups" gorm:"many2many:group_members"`
 	CreatedAt   time.Time  `json:"created_at" db:"created_at" sql:"DEFAULT:CURRENT_TIMESTAMP"`
+	Status      string     `json:"status" db:"status"`
 	//LastSeen vkapi.LastSeen `json:"last_seen" db:"last_seen"`
 }
 

@@ -92,7 +92,7 @@ while (i < 25 && (offset + %v) < %v) {
     "sort": "id_asc",
     "count": "1000",
     "offset": (%v + offset),
-    "fields": "sex,deactivated,last_seen,photo,photo_200,city"
+    "fields": "sex,deactivated,last_seen,photo,photo_200,city,status"
   });
   members.push(m.items);
   count = m.count;
@@ -113,9 +113,10 @@ return { "users": members, "count": count };
 			Users [][]*models.User `json:"users"`
 			Count int              `json:"count"`
 		}
+		fmt.Println("AAAAAAAAA", string(r.Response))
 		err = json.Unmarshal(r.Response, &resp)
 		if err != nil {
-			log.Println("error unmarshal")
+			log.Println("error unmarshal", err)
 			return nil, err
 		}
 
