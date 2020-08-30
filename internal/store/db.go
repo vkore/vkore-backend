@@ -46,7 +46,7 @@ func CreateUsers(users []*models.User) error {
 	var uss []interface{}
 
 	for _, user := range users {
-		if user.Deactivated != nil {
+		if user == nil || user.Deactivated != nil {
 			continue
 		}
 		uss = append(uss, user)

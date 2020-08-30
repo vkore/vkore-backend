@@ -21,7 +21,7 @@ type User struct {
 	City        *UserCity  `json:"city"`
 	CityID      int        `json:"city_id"`
 	Deactivated *string    `json:"deactivated" db:"deactivated"`
-	LastSeen    *time.Time `json:"last_seen" db:"last_seen"`
+	LastSeen    *time.Time `json:"-" db:"last_seen"`
 	Groups      []*Group   `json:"groups" gorm:"many2many:group_members"`
 	CreatedAt   time.Time  `json:"created_at" db:"created_at" sql:"DEFAULT:CURRENT_TIMESTAMP"`
 	Status      string     `json:"status" db:"status"`

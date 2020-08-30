@@ -1,6 +1,7 @@
 package vkore
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	vkapi "github.com/himidori/golang-vk-api"
@@ -9,14 +10,11 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"runtime/debug"
 	"sync"
+	"text/template"
 	"time"
 )
-
-//var groupsToParse = []string{"podolsk_naodinraz", "knowledge50pd", "znakomstva_v_podolske", "virtual.dating", "podolsk_love", "znakomstvoodolsk", "podolsk_znakomstva_v", "publicpoznakomlys2016"}
-//var groupsToParse = []string{"podolsk_naodinraz", "knowledge50pd"}
-
-var wg sync.WaitGroup
 
 var client *vkapi.VKClient
 
@@ -26,7 +24,15 @@ func Init() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	client.Client.Timeout = 60 * time.Second
+	client.Client.Timeout = 240 * time.Second
+}
+
+type groupMembersParams struct{ Offset, TotalCount, GroupID, UsersCount, PerPage int }
+
+func (gmp groupMembersParams) NextPage() *groupMembersParams {
+	gmp.Offset += gmp.PerPage
+	gmp.TotalCount += gmp.PerPage
+	return &gmp
 }
 
 func GetPages(groupsToParse []string) {
@@ -34,7 +40,7 @@ func GetPages(groupsToParse []string) {
 		var g *models.Group
 		rrr, err := store.GetGroupByScreenName(group)
 		if rrr == nil || err != nil {
-			groupInfo, err := ResolveScreenName(client, group)
+			groupInfo, err := ResolveScreenName(group)
 			if err != nil {
 				log.Printf("can't get info about %v group: %v", group, err)
 				continue
@@ -48,98 +54,153 @@ func GetPages(groupsToParse []string) {
 			g = rrr
 		}
 
-		//groupLastUpdate, err := store.GetGroupLastUpdate(g.ID)
-		//if err == nil {
-		//	yesterday := time.Now().AddDate(0, 0, -1)
-		//	if groupLastUpdate == nil {
-		//		log.Printf(`Last update for group "%v" is nil and no errors`, group)
-		//	} else if groupLastUpdate.After(yesterday) {
-		//		log.Printf(`no need to update for group "%v": %v`, group, groupLastUpdate.Format(time.RFC822))
-		//		continue
-		//	}
-		//}
-
-		groupMembers, err := GetGroupMembers(client, g)
+		groupMembers, err := GetGroupMembers(g)
 		log.Println("GROUP MEMBERS:", len(groupMembers))
 		if err != nil {
 			log.Println("can't get members:", groupMembers)
 		}
+		groupMembers = nil
 	}
+	fmt.Println("FREE MEMORY")
+	debug.FreeOSMemory()
 }
 
-func GetGroupMembers(c *vkapi.VKClient, group *models.Group) ([]*models.User, error) {
-	var users []*models.User
-	if err := store.GormDB().Where(models.Group{ID: group.ID}).Attrs(group).FirstOrCreate(group).Error; err != nil {
-		log.Printf("error get or create gorup in database: %v", err)
-		return nil, err
-	}
+func groupMembersQuery(gmp *groupMembersParams) string {
+	t := template.New("Get group users")
 
-	totalCount := 25000
-	//totalCount := 10000
-	offset := 0
-	for {
-		values := make(url.Values)
-		values.Set("code", fmt.Sprintf(`
+	params := struct {
+		*groupMembersParams
+		Loops int
+	}{gmp, gmp.PerPage / 1000}
+
+	_, _ = t.Parse(`
 var members = [];
 var offset = 0;
 
 var count = 0;
 var i = 0;
-while (i < 25 && (offset + %v) < %v) {
+while (i < {{.Loops}} && (offset + {{.Offset}}) < {{.TotalCount}}) {
   var m = API.groups.getMembers({
-    "group_id": %v,
+    "group_id": {{.GroupID}},
     "v": "5.27",
     "sort": "id_asc",
-    "count": "1000",
-    "offset": (%v + offset),
+    "count": "{{.UsersCount}}",
+    "offset": ({{.Offset}} + offset),
     "fields": "sex,deactivated,last_seen,photo,photo_200,city,status"
   });
   members.push(m.items);
   count = m.count;
-  offset = offset + 1000;
+  offset = offset + {{.UsersCount}};
   i = i + 1;
 };
 return { "users": members, "count": count };
-`, offset, totalCount, group.ID, offset))
+`)
+	var w bytes.Buffer
+	_ = t.Execute(&w, params)
 
-		r, err := c.MakeRequest("execute", values)
-		if err != nil {
-			log.Println("request error", err)
-			return nil, err
-		}
-		//resp := new(models.GroupMembers)
-		//var resp interface{}
-		var resp struct {
-			Users [][]*models.User `json:"users"`
-			Count int              `json:"count"`
-		}
-		fmt.Println("AAAAAAAAA", string(r.Response))
-		err = json.Unmarshal(r.Response, &resp)
-		if err != nil {
-			log.Println("error unmarshal", err)
-			return nil, err
-		}
+	return w.String()
+}
 
-		for _, us := range resp.Users {
-			users = append(users, us...)
-		}
+func getGroupMembers(queryParams *groupMembersParams, result *userGroupsResult) error {
+	values := make(url.Values)
+	values.Set("code", groupMembersQuery(queryParams))
 
-		err = store.CreateUsers(users)
-		if err != nil {
-			fmt.Println("error adding users to database:", err)
-		}
-		err = store.AddGroupMembers(group.ID, users)
-		if err != nil {
-			log.Println("error creating users in database:", err)
-		}
-		fmt.Println("users added")
-		if len(users) >= resp.Count {
+	r, err := client.MakeRequest("execute", values)
+	if err != nil {
+		log.Println("request error", err)
+		return err
+	}
+	fmt.Println("RESPONSE ERROR", r.ResponseError)
+
+	err = json.Unmarshal(r.Response, result)
+	if err != nil {
+		log.Println("error unmarshal", err)
+		return err
+	}
+	uss := 0
+	for _, user := range result.Users {
+		uss += len(user)
+	}
+	fmt.Println("GOTTTT", uss, "USERS")
+	return nil
+}
+
+type userGroupsResult struct {
+	Users [][]*models.User `json:"users"`
+	Count int              `json:"count"`
+}
+
+func GetGroupMembers(group *models.Group) ([]*models.User, error) {
+	count, _, err := client.GroupGetMembers(group.ID, 0, 0)
+	if err != nil {
+		return nil, fmt.Errorf("error getting group members count: %v", err)
+	}
+	users := make(chan *models.User, count)
+
+	if err := store.GormDB().Where(models.Group{ID: group.ID}).Attrs(group).FirstOrCreate(group).Error; err != nil {
+		log.Printf("error get or create gorup in database: %v", err)
+		return nil, err
+	}
+
+	queryParams := groupMembersParams{
+		Offset:     0,
+		TotalCount: 10000,
+		GroupID:    group.ID,
+		UsersCount: 1000,
+		PerPage:    10000,
+	}
+
+	ticker := time.NewTicker(334 * time.Millisecond)
+
+	var wg sync.WaitGroup
+	for {
+		<-ticker.C
+		wg.Add(1)
+		go func(qp groupMembersParams) {
+			defer wg.Done()
+			fmt.Println("START QUERY")
+			var resp userGroupsResult
+			err := getGroupMembers(&qp, &resp)
+			if err != nil {
+				log.Println("error getting group memebers:", err)
+			}
+			for _, us := range resp.Users {
+				for _, u := range us {
+					users <- u
+				}
+			}
+		}(queryParams)
+
+		if queryParams.TotalCount >= count {
 			break
 		}
-		offset += 25000
-		totalCount += 25000
+		queryParams = *queryParams.NextPage()
 	}
-	groupedUsers := groupUsersByCity(users)
+	wg.Wait()
+	close(users)
+	fmt.Println("LEN OF CHANNEL:", len(users))
+	var uss []*models.User
+	fmt.Println("START READING FROM CHANNEL")
+	for user := range users {
+		if user == nil {
+			fmt.Println("USER IS NIL")
+			continue
+		}
+		uss = append(uss, user)
+	}
+	fmt.Println("USERS COUNT", len(uss))
+	err = store.CreateUsers(uss)
+	if err != nil {
+		fmt.Println("error adding users to database:", err)
+	}
+
+	err = store.AddGroupMembers(group.ID, uss)
+	if err != nil {
+		log.Println("error creating users in database:", err)
+	}
+	fmt.Println("users added")
+
+	groupedUsers := groupUsersByCity(uss)
 
 	for city, users := range groupedUsers {
 		err := store.BindUsersToCity(&city, users)
@@ -147,7 +208,7 @@ return { "users": members, "count": count };
 			log.Println("error binding cities to users:", err)
 		}
 	}
-	return users, nil
+	return uss, nil
 }
 
 type UsersByCity map[models.UserCity][]*models.User
@@ -162,11 +223,11 @@ func groupUsersByCity(users []*models.User) UsersByCity {
 	return usersByCity
 }
 
-func ResolveScreenName(c *vkapi.VKClient, screenName string) (*models.Resolver, error) {
+func ResolveScreenName(screenName string) (*models.Resolver, error) {
 	values := make(url.Values)
 	values.Set("screen_name", screenName)
 
-	r, err := c.MakeRequest("utils.resolveScreenName", values)
+	r, err := client.MakeRequest("utils.resolveScreenName", values)
 	if err != nil {
 		return nil, err
 	}

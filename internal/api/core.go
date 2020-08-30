@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/vkore/vkore/internal/store"
 	"github.com/vkore/vkore/internal/vkore"
@@ -16,6 +17,7 @@ var vkURL = regexp.MustCompile(`^((https?:\/\/)?(m\.)?((vkontakte|vk)\.)(com|ru)
 
 func ListenAndServe() {
 	r := gin.Default()
+	pprof.Register(r)
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"message": "pong",
@@ -26,27 +28,9 @@ func ListenAndServe() {
 	r.GET("/api/all_groups", GetAllGroups)
 	r.POST("/api/load_groups", LoadGroups)
 	r.GET("/api/get_cities", getCities)
+
 	r.Run()
 }
-
-//func GetPages(c *gin.Context) {
-//
-//	//var s map[string]interface{}
-//	//err := c.Bind(&s)
-//	//if err != nil {
-//	//	c.JSON(http.StatusBadRequest, gin.H{
-//	//		"error": fmt.Sprintf(`%v`, err),
-//	//	})
-//	//}
-//
-//	r := vkore.GetPages()
-//	if len(r) > 20 {
-//		c.JSON(http.StatusOK, vkore.GetPages()[:20])
-//		return
-//	}
-//
-//	c.JSON(http.StatusOK, vkore.GetPages())
-//}
 
 func invalidVariable(c *gin.Context, name string) {
 	c.JSON(http.StatusBadRequest, gin.H{
@@ -113,6 +97,7 @@ func GetUsers(c *gin.Context) {
 		"items":      target,
 		"totalCount": totalCount,
 	})
+	target = nil
 }
 
 func LoadGroups(c *gin.Context) {
